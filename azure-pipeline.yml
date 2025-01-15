@@ -1,0 +1,16 @@
+variables:
+- group: twitter-app-secrets  # Variable group defined in Azure DevOps
+
+steps:
+- task: AzureKeyVault@2
+  inputs:
+    azureSubscription: 'Your-Azure-Subscription'
+    KeyVaultName: 'Your-KeyVault-Name'
+    SecretsFilter: '*'
+
+- script: |
+    echo "Setting up environment variables..."
+    echo "TWITTER_BASE_URL=$(TWITTER_BASE_URL)" >> .env
+    echo "TWITTER_USERNAME=$(TWITTER_USERNAME)" >> .env
+    echo "TWITTER_PASSWORD=$(TWITTER_PASSWORD)" >> .env
+    echo "TWITTER_PHONE_NUMBER=$(TWITTER_PHONE_NUMBER)" >> .env 
