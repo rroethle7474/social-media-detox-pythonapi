@@ -33,26 +33,25 @@ stages:
         sudo apt-get update
         sudo apt-get install -y google-chrome-stable
 
-        # Get Chrome version
-        CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | awk -F'.' '{print $1}')
-        echo "Chrome version: $CHROME_VERSION"
+        # Get Chrome version and install matching ChromeDriver
+        CHROME_VERSION=$(google-chrome --version | awk '{print $3}')
+        echo "Full Chrome version: $CHROME_VERSION"
 
-        # Download latest ChromeDriver for this Chrome version
-        CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
-        echo "ChromeDriver version: $CHROMEDRIVER_VERSION"
-
-        if [ -z "$CHROMEDRIVER_VERSION" ]; then
-            echo "Failed to get ChromeDriver version. Falling back to latest stable version."
-            CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE")
+        # Try direct version mapping first
+        wget -q "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROME_VERSION/linux64.zip"
+        
+        if [ $? -ne 0 ]; then
+            echo "Falling back to latest ChromeDriver..."
+            wget -q "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/LATEST_RELEASE_STABLE"
+            CHROMEDRIVER_VERSION=$(cat LATEST_RELEASE_STABLE)
+            echo "Using latest stable ChromeDriver version: $CHROMEDRIVER_VERSION"
+            wget -q "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROMEDRIVER_VERSION/linux64.zip"
         fi
 
-        echo "Downloading ChromeDriver version: $CHROMEDRIVER_VERSION"
-        wget -q "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
-
         # Verify download and install
-        if [ -f "chromedriver_linux64.zip" ]; then
-            unzip chromedriver_linux64.zip
-            sudo mv chromedriver /usr/local/bin/
+        if [ -f "linux64.zip" ]; then
+            unzip linux64.zip
+            sudo mv chrome-linux64/chromedriver /usr/local/bin/
             sudo chmod +x /usr/local/bin/chromedriver
             echo "ChromeDriver installed successfully"
             chromedriver --version
