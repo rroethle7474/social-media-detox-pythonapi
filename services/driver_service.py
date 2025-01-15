@@ -6,26 +6,32 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import os
 import logging
 
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+
 logger = logging.getLogger(__name__)
 
 class DriverService:
     def setup_driver(self):
         chrome_options = webdriver.ChromeOptions()
-        # Required for Linux/Azure environment
         chrome_options.add_argument('--headless')
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.binary_location = "/usr/bin/google-chrome"  # Linux Chrome path
         
-        # Stealth settings (keeping your existing ones)
+        # Version mismatch handling
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--ignore-certificate-errors')
+        
+        # Stealth settings
         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
         chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
         chrome_options.add_experimental_option('useAutomationExtension', False)
         chrome_options.add_argument('--disable-notifications')
         chrome_options.add_argument('--disable-popup-blocking')
-        chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36')
+        chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
         
-        return webdriver.Chrome(options=chrome_options)
+        service = Service(ChromeDriverManager().install())
+        return webdriver.Chrome(service=service, options=chrome_options)
 
     def login(self, driver):
         username = os.getenv('TWITTER_USERNAME')

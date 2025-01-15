@@ -25,7 +25,7 @@ stages:
         addToPath: true
       displayName: 'Use Python $(pythonVersion)'
 
-    # Install Chrome and ChromeDriver for Selenium
+    # Install Chrome and set up environment for ChromeDriver
     - script: |
         # Install Chrome
         wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
@@ -33,28 +33,13 @@ stages:
         sudo apt-get update
         sudo apt-get install -y google-chrome-stable
 
-        # Get Chrome version
-        CHROME_VERSION=$(google-chrome --version)
-        echo "Installed $CHROME_VERSION"
-
-        # Use a known stable version of ChromeDriver
-        CHROMEDRIVER_VERSION="120.0.6099.109"
-        echo "Installing ChromeDriver version $CHROMEDRIVER_VERSION"
-
-        # Download and extract ChromeDriver
-        wget -q "https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip"
+        # Print Chrome version for logging
+        google-chrome --version
         
-        # Verify download and install
-        if [ -f "chromedriver_linux64.zip" ]; then
-            unzip chromedriver_linux64.zip
-            sudo mv chromedriver /usr/local/bin/
-            sudo chmod +x /usr/local/bin/chromedriver
-            echo "ChromeDriver installed successfully"
-            chromedriver --version
-        else
-            echo "Failed to download ChromeDriver"
-            exit 1
-        fi
+        # Set up environment variables for webdriver-manager
+        echo "##vso[task.setvariable variable=WDM_LOG_LEVEL]0"
+        echo "##vso[task.setvariable variable=WDM_PROGRESS_BAR]0"
+    displayName: 'Install Chrome'
       displayName: 'Install Chrome and ChromeDriver'
 
     # Install Python dependencies
