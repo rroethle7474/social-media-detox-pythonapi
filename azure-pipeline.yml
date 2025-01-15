@@ -33,25 +33,21 @@ stages:
         sudo apt-get update
         sudo apt-get install -y google-chrome-stable
 
-        # Get Chrome version and install matching ChromeDriver
-        CHROME_VERSION=$(google-chrome --version | awk '{print $3}')
-        echo "Full Chrome version: $CHROME_VERSION"
+        # Get Chrome version
+        CHROME_VERSION=$(google-chrome --version)
+        echo "Installed $CHROME_VERSION"
 
-        # Try direct version mapping first
-        wget -q "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROME_VERSION/linux64.zip"
+        # Use a known stable version of ChromeDriver
+        CHROMEDRIVER_VERSION="120.0.6099.109"
+        echo "Installing ChromeDriver version $CHROMEDRIVER_VERSION"
+
+        # Download and extract ChromeDriver
+        wget -q "https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip"
         
-        if [ $? -ne 0 ]; then
-            echo "Falling back to latest ChromeDriver..."
-            wget -q "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/LATEST_RELEASE_STABLE"
-            CHROMEDRIVER_VERSION=$(cat LATEST_RELEASE_STABLE)
-            echo "Using latest stable ChromeDriver version: $CHROMEDRIVER_VERSION"
-            wget -q "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROMEDRIVER_VERSION/linux64.zip"
-        fi
-
         # Verify download and install
-        if [ -f "linux64.zip" ]; then
-            unzip linux64.zip
-            sudo mv chrome-linux64/chromedriver /usr/local/bin/
+        if [ -f "chromedriver_linux64.zip" ]; then
+            unzip chromedriver_linux64.zip
+            sudo mv chromedriver /usr/local/bin/
             sudo chmod +x /usr/local/bin/chromedriver
             echo "ChromeDriver installed successfully"
             chromedriver --version
