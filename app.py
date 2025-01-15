@@ -1,3 +1,5 @@
+import platform
+import subprocess
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -118,12 +120,17 @@ def reset_cache():
 @app.route('/health', methods=['GET'])
 def health_check():
     try:
+        chrome_version = subprocess.check_output(['google-chrome', '--version']).decode().strip()
         return jsonify({
             "Success": True,
             "Message": "API is running",
             "Data": {
                 "status": "healthy",
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now(UTC).isoformat(),
+                "chrome_version": chrome_version,
+                "cache_stats": cache_service.get_stats(),
+                "python_version": platform.python_version(),
+                "environment": os.getenv('WEBSITE_HOSTNAME', 'local')
             },
             "Errors": None
         })
@@ -251,6 +258,18 @@ def health_check():
 #     finally:
 #         logger.info("Simulate Closing driver")
 #         #driver.quit()
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    # Log the error with traceback
+    app.logger.error(f"Unhandled exception: {str(e)}", exc_info=True)
+    
+    return jsonify({
+        "Success": False,
+        "Message": "An unexpected error occurred",
+        "Data": None,
+        "Errors": [str(e)]
+    }), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

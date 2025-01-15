@@ -1,16 +1,193 @@
+trigger:
+  branches:
+    include:
+    - main
+  paths:
+    exclude:
+    - README.md
+    - .gitignore
+
 variables:
-- group: twitter-app-secrets  # Variable group defined in Azure DevOps
+  pythonVersion: '3.12'
+  vmImageName: 'ubuntu-latest'
 
-steps:
-- task: AzureKeyVault@2
-  inputs:
-    azureSubscription: 'Your-Azure-Subscription'
-    KeyVaultName: 'Your-KeyVault-Name'
-    SecretsFilter: '*'
+stages:
+- stage: Build
+  displayName: 'Build Stage'
+  jobs:
+  - job: BuildJob
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '$(pythonVersion)'
+        addToPath: true
+      displayName: 'Use Python $(pythonVersion)'
 
-- script: |
-    echo "Setting up environment variables..."
-    echo "TWITTER_BASE_URL=$(TWITTER_BASE_URL)" >> .env
-    echo "TWITTER_USERNAME=$(TWITTER_USERNAME)" >> .env
-    echo "TWITTER_PASSWORD=$(TWITTER_PASSWORD)" >> .env
-    echo "TWITTER_PHONE_NUMBER=$(TWITTER_PHONE_NUMBER)" >> .env 
+    # Install Chrome and ChromeDriver for Selenium
+    - script: |
+        wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+        sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+        CHROME_VERSION=$(google-chrome --version | cut -d ' ' -f 3 | cut -d '.' -f 1)
+        wget -q "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION"
+        CHROMEDRIVER_VERSION=$(cat "LATEST_RELEASE_$CHROME_VERSION")
+        wget -q "https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip"
+        unzip chromedriver_linux64.zip
+        sudo mv chromedriver /usr/local/bin/
+        sudo chmod +x /usr/local/bin/chromedriver
+      displayName: 'Install Chrome and ChromeDriver'
+
+    # Install Python dependencies
+    - script: |
+        python -m pip install --upgrade pip
+        pip install gunicorn==21.2.0
+        pip install -r requirements.txt
+      displayName: 'Install Python dependencies'
+
+    # Create startup script
+    - task: Bash@3
+      inputs:
+        targetType: 'inline'
+        script: |
+          cat > startup.sh << 'EOF'
+          #!/bin/bash
+          set -e  # Exit on any error
+
+          # Check if Chrome is installed
+          if ! command -v google-chrome &> /dev/null; then
+              echo "Installing Chrome..."
+              curl -sS -o - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+              echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list
+              apt-get update
+              apt-get install -y google-chrome-stable
+          fi
+
+          # Set environment name based on app service name
+          if [[ $WEBSITE_HOSTNAME == *"-test"* ]]; then
+              cp .env.test .env
+          else
+              cp .env.prod .env
+          fi
+
+          # Start the application with gunicorn
+          exec gunicorn --bind=0.0.0.0 --timeout 600 --workers 2 --threads 2 app:app
+          EOF
+
+          chmod +x startup.sh
+      displayName: 'Create startup script'
+
+    # Create test environment file
+    - task: Bash@3
+      inputs:
+        targetType: 'inline'
+        script: |
+          cat > .env.test << EOF
+          TWITTER_USERNAME=$(TWITTER_USERNAME)
+          TWITTER_PASSWORD=$(TWITTER_PASSWORD)
+          TWITTER_PHONE_NUMBER=$(TWITTER_PHONE_NUMBER)
+          TWITTER_BASE_URL=https://x.com
+          EOF
+      displayName: 'Create test environment file'
+      env:
+        TWITTER_USERNAME: $(TWITTER_USERNAME)
+        TWITTER_PASSWORD: $(TWITTER_PASSWORD)
+        TWITTER_PHONE_NUMBER: $(TWITTER_PHONE_NUMBER)
+
+    # Create prod environment file
+    - task: Bash@3
+      inputs:
+        targetType: 'inline'
+        script: |
+          cat > .env.prod << EOF
+          TWITTER_USERNAME=$(TWITTER_USERNAME)
+          TWITTER_PASSWORD=$(TWITTER_PASSWORD)
+          TWITTER_PHONE_NUMBER=$(TWITTER_PHONE_NUMBER)
+          TWITTER_BASE_URL=https://x.com
+          EOF
+      displayName: 'Create prod environment file'
+      env:
+        TWITTER_USERNAME: $(TWITTER_USERNAME)
+        TWITTER_PASSWORD: $(TWITTER_PASSWORD)
+        TWITTER_PHONE_NUMBER: $(TWITTER_PHONE_NUMBER)
+
+    # Archive files
+    - task: ArchiveFiles@2
+      inputs:
+        rootFolderOrFile: '$(System.DefaultWorkingDirectory)'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/app.zip'
+        replaceExistingArchive: true
+        verbose: true
+      displayName: 'Archive project files'
+
+    # Publish artifacts
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: 'drop'
+        publishLocation: 'Container'
+      displayName: 'Publish artifacts'
+
+- stage: DeployTest
+  displayName: 'Deploy to Test'
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - deployment: DeployTest
+    environment: 'test'
+    pool:
+      vmImage: $(vmImageName)
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadBuildArtifacts@1
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'drop'
+              downloadPath: '$(System.ArtifactsDirectory)'
+
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: 'SocialMediaDetoxConnection'
+              appName: 'smd-pythonapi-test'
+              package: '$(System.ArtifactsDirectory)/drop/app.zip'
+              appType: 'webAppLinux'
+              runtimeStack: 'PYTHON|3.12'
+              startUpCommand: 'bash startup.sh'
+              healthCheckPath: '/health'
+
+- stage: DeployProd
+  displayName: 'Deploy to Production'
+  dependsOn: DeployTest
+  condition: succeeded()
+  jobs:
+  - deployment: DeployProd
+    environment: 'prod'
+    pool:
+      vmImage: $(vmImageName)
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadBuildArtifacts@1
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'drop'
+              downloadPath: '$(System.ArtifactsDirectory)'
+
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: 'SocialMediaDetoxConnection'
+              appName: 'smd-pythonapi-prod'
+              package: '$(System.ArtifactsDirectory)/drop/app.zip'
+              appType: 'webAppLinux'
+              runtimeStack: 'PYTHON|3.12'
+              startUpCommand: 'bash startup.sh'
+              healthCheckPath: '/health'
