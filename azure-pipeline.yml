@@ -27,17 +27,39 @@ stages:
 
     # Install Chrome and ChromeDriver for Selenium
     - script: |
+        # Install Chrome
         wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
         sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
         sudo apt-get update
         sudo apt-get install -y google-chrome-stable
-        CHROME_VERSION=$(google-chrome --version | cut -d ' ' -f 3 | cut -d '.' -f 1)
-        wget -q "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION"
-        CHROMEDRIVER_VERSION=$(cat "LATEST_RELEASE_$CHROME_VERSION")
-        wget -q "https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip"
-        unzip chromedriver_linux64.zip
-        sudo mv chromedriver /usr/local/bin/
-        sudo chmod +x /usr/local/bin/chromedriver
+
+        # Get Chrome version
+        CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | awk -F'.' '{print $1}')
+        echo "Chrome version: $CHROME_VERSION"
+
+        # Download latest ChromeDriver for this Chrome version
+        CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
+        echo "ChromeDriver version: $CHROMEDRIVER_VERSION"
+
+        if [ -z "$CHROMEDRIVER_VERSION" ]; then
+            echo "Failed to get ChromeDriver version. Falling back to latest stable version."
+            CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE")
+        fi
+
+        echo "Downloading ChromeDriver version: $CHROMEDRIVER_VERSION"
+        wget -q "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
+
+        # Verify download and install
+        if [ -f "chromedriver_linux64.zip" ]; then
+            unzip chromedriver_linux64.zip
+            sudo mv chromedriver /usr/local/bin/
+            sudo chmod +x /usr/local/bin/chromedriver
+            echo "ChromeDriver installed successfully"
+            chromedriver --version
+        else
+            echo "Failed to download ChromeDriver"
+            exit 1
+        fi
       displayName: 'Install Chrome and ChromeDriver'
 
     # Install Python dependencies
