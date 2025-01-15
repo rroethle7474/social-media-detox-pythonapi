@@ -39,8 +39,7 @@ stages:
         # Set up environment variables for webdriver-manager
         echo "##vso[task.setvariable variable=WDM_LOG_LEVEL]0"
         echo "##vso[task.setvariable variable=WDM_PROGRESS_BAR]0"
-    displayName: 'Install Chrome'
-      displayName: 'Install Chrome and ChromeDriver'
+      displayName: 'Install Chrome'
 
     # Install Python dependencies
     - script: |
