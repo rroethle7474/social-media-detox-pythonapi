@@ -38,7 +38,6 @@ stages:
         targetType: 'inline'
         script: |
           cat > $(Build.ArtifactStagingDirectory)/.env.test << EOF
-          cat > $(Build.ArtifactStagingDirectory)/.env.test << EOF
           TWITTER_USERNAME=$(TWITTER_USERNAME)
           TWITTER_PASSWORD=$(TWITTER_PASSWORD)
           TWITTER_PHONE_NUMBER=$(TWITTER_PHONE_NUMBER)
@@ -55,7 +54,6 @@ stages:
       inputs:
         targetType: 'inline'
         script: |
-          cat > $(Build.ArtifactStagingDirectory)/.env.prod << EOF
           cat > $(Build.ArtifactStagingDirectory)/.env.prod << EOF
           TWITTER_USERNAME=$(TWITTER_USERNAME)
           TWITTER_PASSWORD=$(TWITTER_PASSWORD)
@@ -121,7 +119,6 @@ stages:
     - task: ArchiveFiles@2
       inputs:
         rootFolderOrFile: '$(Build.ArtifactStagingDirectory)'
-        rootFolderOrFile: '$(Build.ArtifactStagingDirectory)'
         includeRootFolder: false
         archiveType: 'zip'
         archiveFile: '$(Build.ArtifactStagingDirectory)/app.zip'
@@ -131,7 +128,6 @@ stages:
     # Publish artifacts
     - task: PublishBuildArtifacts@1
       inputs:
-        PathtoPublish: '$(Build.ArtifactStagingDirectory)/app.zip'
         PathtoPublish: '$(Build.ArtifactStagingDirectory)/app.zip'
         ArtifactName: 'drop'
         publishLocation: 'Container'
@@ -155,10 +151,8 @@ stages:
               azureSubscription: 'SocialMediaDetoxConnection'
               appName: 'smd-pythonapi-test'
               package: '$(Pipeline.Workspace)/drop/app.zip'
-              package: '$(Pipeline.Workspace)/drop/app.zip'
               appType: 'webAppLinux'
               runtimeStack: 'PYTHON|3.12'
-              startUpCommand: '/bin/bash startup.sh'
               startUpCommand: '/bin/bash startup.sh'
 
 - stage: DeployProd
@@ -179,8 +173,6 @@ stages:
               azureSubscription: 'SocialMediaDetoxConnection'
               appName: 'smd-pythonapi-prod'
               package: '$(Pipeline.Workspace)/drop/app.zip'
-              package: '$(Pipeline.Workspace)/drop/app.zip'
               appType: 'webAppLinux'
               runtimeStack: 'PYTHON|3.12'
-              startUpCommand: '/bin/bash startup.sh'
               startUpCommand: '/bin/bash startup.sh'
