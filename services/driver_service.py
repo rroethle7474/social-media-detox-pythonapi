@@ -17,6 +17,7 @@ class DriverService:
         chrome_options.add_argument('--headless')
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--window-size=1920,1080')  # Set consistent window size
         
         # Version mismatch handling
         chrome_options.add_argument('--disable-gpu')
@@ -104,12 +105,40 @@ class DriverService:
 
     def click_latest_button(self, driver):
         try:
-            latest_button = WebDriverWait(driver, 3).until(
-                EC.element_to_be_clickable((By.XPATH, "//span[text()='Latest']"))
-            )
-            latest_button.click()
+            # Increase wait time and add multiple selectors for better reliability
+            selectors = [
+                "//span[text()='Latest']",
+                "//span[contains(text(),'Latest')]",
+                "//*[@role='tab']//span[text()='Latest']"
+            ]
+            
+            latest_button = None
+            for selector in selectors:
+                try:
+                    latest_button = WebDriverWait(driver, 10).until(
+                        EC.presence_of_element_located((By.XPATH, selector))
+                    )
+                    # Ensure element is in viewport
+                    driver.execute_script("arguments[0].scrollIntoView(true);", latest_button)
+                    # Add a small wait after scroll
+                    WebDriverWait(driver, 2).until(
+                        EC.element_to_be_clickable((By.XPATH, selector))
+                    )
+                    break
+                except TimeoutException:
+                    continue
+            
+            if latest_button is None:
+                raise TimeoutException("Latest button not found with any selector")
+                
+            # Try JavaScript click if regular click fails
+            try:
+                latest_button.click()
+            except Exception:
+                driver.execute_script("arguments[0].click();", latest_button)
+                
         except TimeoutException:
-            logger.warning("Latest button not found or not clickable")
+            logger.warning("Latest button not found or not clickable after trying all selectors")
             raise
         except Exception as e:
             logger.error(f"Error clicking latest button: {str(e)}")

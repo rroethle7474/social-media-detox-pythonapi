@@ -33,6 +33,10 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
+# Configure for long-running connections
+app.config['PERMANENT_SESSION_LIFETIME'] = 600  # 10 minutes
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
 driver_service = DriverService()
 cache_service = CacheService()
 twitter_service = TwitterService(driver_service, cache_service)
