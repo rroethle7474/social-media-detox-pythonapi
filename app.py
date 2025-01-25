@@ -33,9 +33,10 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# Configure for long-running connections
-# app.config['PERMANENT_SESSION_LIFETIME'] = 600  # 10 minutes
-# app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+# Production configurations
+app.config['PROPAGATE_EXCEPTIONS'] = True  # Ensure exceptions are propagated
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max request size
+app.config['JSON_SORT_KEYS'] = False  # Preserve JSON response order
 
 driver_service = DriverService()
 cache_service = CacheService()

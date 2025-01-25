@@ -21,5 +21,17 @@ else
     cp .env.prod .env
 fi
 
+# Create log directory if it doesn't exist
+mkdir -p /home/LogFiles/gunicorn
+
 echo "Starting gunicorn..."
-exec gunicorn --bind=0.0.0.0 --timeout 600 app:app
+exec gunicorn \
+    --bind=0.0.0.0:8000 \
+    --timeout 600 \
+    --workers 2 \
+    --threads 4 \
+    --worker-class gthread \
+    --log-level info \
+    --access-logfile /home/LogFiles/gunicorn/access.log \
+    --error-logfile /home/LogFiles/gunicorn/error.log \
+    app:app
