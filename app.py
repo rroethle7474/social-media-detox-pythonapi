@@ -41,6 +41,16 @@ driver_service = DriverService()
 cache_service = CacheService()
 twitter_service = TwitterService(driver_service, cache_service)
 
+@app.route('/')
+def root():
+    """Root endpoint for health checks"""
+    return jsonify({
+        "Success": True,
+        "Message": "TimeHealer API is running",
+        "Data": None,
+        "Errors": None
+    })
+
 def init_app():
     """Initialize application resources"""
     logger.info("Initializing services...")
