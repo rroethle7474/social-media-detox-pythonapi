@@ -26,12 +26,13 @@ mkdir -p /home/LogFiles/gunicorn
 
 echo "Starting gunicorn..."
 exec gunicorn \
-    --bind=0.0.0.0:8000 \
+    --bind=0.0.0.0:8181 \
     --timeout 600 \
     --workers 2 \
     --threads 4 \
     --worker-class gthread \
-    --log-level info \
+    --log-level debug \
     --access-logfile /home/LogFiles/gunicorn/access.log \
     --error-logfile /home/LogFiles/gunicorn/error.log \
+    --capture-output \
     app:app

@@ -24,7 +24,14 @@ from services.twitter_service import TwitterService
 
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('/home/LogFiles/app.log')
+    ]
+)
 logger = logging.getLogger(__name__)
 
 # Load environment variables
@@ -34,23 +41,41 @@ app = Flask(__name__)
 CORS(app)
 
 # Production configurations
-app.config['PROPAGATE_EXCEPTIONS'] = True  # Ensure exceptions are propagated
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max request size
-app.config['JSON_SORT_KEYS'] = False  # Preserve JSON response order
+app.config['PROPAGATE_EXCEPTIONS'] = True
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+app.config['JSON_SORT_KEYS'] = False
 
-driver_service = DriverService()
-cache_service = CacheService()
-twitter_service = TwitterService(driver_service, cache_service)
+# Initialize services
+try:
+    driver_service = DriverService()
+    cache_service = CacheService()
+    twitter_service = TwitterService(driver_service, cache_service)
+    logger.info("Services initialized successfully")
+except Exception as e:
+    logger.error(f"Error initializing services: {str(e)}")
+    raise
 
 @app.route('/')
 def root():
     """Root endpoint for health checks"""
-    return jsonify({
-        "Success": True,
-        "Message": "TimeHealer API is running",
-        "Data": None,
-        "Errors": None
-    })
+    try:
+        return jsonify({
+            "Success": True,
+            "Message": "TimeHealer API is running",
+            "Data": {
+                "status": "healthy",
+                "timestamp": datetime.now(UTC).isoformat()
+            },
+            "Errors": None
+        })
+    except Exception as e:
+        logger.error(f"Error in root endpoint: {str(e)}")
+        return jsonify({
+            "Success": False,
+            "Message": "Error in health check",
+            "Data": None,
+            "Errors": [str(e)]
+        }), 500
 
 def init_app():
     """Initialize application resources"""
