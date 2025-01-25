@@ -34,8 +34,8 @@ app = Flask(__name__)
 CORS(app)
 
 # Configure for long-running connections
-app.config['PERMANENT_SESSION_LIFETIME'] = 600  # 10 minutes
-app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+# app.config['PERMANENT_SESSION_LIFETIME'] = 600  # 10 minutes
+# app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
 driver_service = DriverService()
 cache_service = CacheService()
@@ -45,6 +45,7 @@ twitter_service = TwitterService(driver_service, cache_service)
 @app.route('/ChannelResults', methods=['POST'])
 def channel_search_results():
     try:
+        print("Retrieving channel search results")
         url = request.json.get('url')
         isDefault = request.json.get('isDefault', False)
         search_queries = request.json.get('search_queries', [])
@@ -75,6 +76,7 @@ def channel_search_results():
 @app.route('/SearchResults', methods=['POST'])
 def search_results():
     try:
+        print("Retrieving search results")
         url = request.json.get('url')
         isDefault = request.json.get('isDefault', False)
         search_queries = request.json.get('search_queries', [])
@@ -124,7 +126,9 @@ def reset_cache():
 @app.route('/health', methods=['GET'])
 def health_check():
     try:
+        print("Checking health")
         chrome_version = subprocess.check_output(['google-chrome', '--version']).decode().strip()
+        print("Chrome version: ", chrome_version)
         return jsonify({
             "Success": True,
             "Message": "API is running",
