@@ -189,7 +189,6 @@ class TwitterService:
                 for tweet in tweets[:num_posts]:
                     try:
                         embed_url = self.__extract_tweet_url(tweet)
-                        print(f"Embed URL: {embed_url}")
                         if self.is_invalid_embed_url(embed_url):
                             print(f"Invalid embed URL: {embed_url}")
                             continue;
