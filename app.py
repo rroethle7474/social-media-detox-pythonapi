@@ -24,13 +24,22 @@ from services.twitter_service import TwitterService
 
 
 # Set up logging
+log_handlers = [logging.StreamHandler()]
+
+# Determine log file path based on environment
+if os.getenv('WEBSITE_HOSTNAME'):  # Running in Azure
+    log_path = '/home/LogFiles/app.log'
+else:  # Running locally
+    log_dir = 'logs'
+    os.makedirs(log_dir, exist_ok=True)
+    log_path = os.path.join(log_dir, 'app.log')
+
+log_handlers.append(logging.FileHandler(log_path))
+
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('/home/LogFiles/app.log')
-    ]
+    handlers=log_handlers
 )
 logger = logging.getLogger(__name__)
 
@@ -77,9 +86,28 @@ def root():
             "Errors": [str(e)]
         }), 500
 
+# Add startup readiness check
+ready = False
+
 def init_app():
     """Initialize application resources"""
+    global ready
     logger.info("Initializing services...")
+    ready = True
+
+@app.before_request
+def check_ready():
+    if not ready and request.endpoint != 'health_check':
+        return jsonify({
+            "Success": False,
+            "Message": "Application is starting up",
+            "Data": None,
+            "Errors": ["Application not ready"]
+        }), 503
+
+# Initialize the app
+with app.app_context():
+    init_app()
 
 @app.teardown_appcontext
 def cleanup_context(exception=None):
@@ -89,10 +117,6 @@ def cleanup_context(exception=None):
 # Register cleanup on process termination
 import atexit
 atexit.register(driver_service.cleanup_all_drivers)
-
-# Initialize the app
-with app.app_context():
-    init_app()
 
 # methods for the api
 @app.route('/ChannelResults', methods=['POST'])
@@ -181,7 +205,11 @@ def health_check():
     try:
         print("Checking health")
         chrome_version = "Not checked in local environment"
-        
+        if not ready:
+            return jsonify({
+                "Success": False,
+                "Message": "Application starting",
+            }), 503
         # Only check Chrome version in Azure environment
         if os.getenv('WEBSITE_HOSTNAME'):
             try:
@@ -301,6 +329,7 @@ def health_check():
 
 #         logger.info("Attempting to locate password input")
 #         password_input = find_password_input(driver)
+#         password_input.send_keys(password)
 #         password_input.send_keys(password)
 #         logger.info("Password entered successfully")
         

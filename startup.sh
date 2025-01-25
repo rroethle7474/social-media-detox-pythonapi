@@ -2,7 +2,10 @@
 set -e  # Exit on any error
 
 echo "Adding Chrome repository..."
-curl -sS -o - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+if ! curl -sS -o - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -; then
+    echo "Failed to add Chrome signing key"
+    exit 1
+fi
 echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list
 
 echo "Updating package list..."
@@ -23,6 +26,9 @@ fi
 
 # Create log directory if it doesn't exist
 mkdir -p /home/LogFiles/gunicorn
+
+echo "Adding startup delay for health checks..."
+sleep 5
 
 echo "Starting gunicorn..."
 exec gunicorn \
