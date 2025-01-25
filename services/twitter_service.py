@@ -36,22 +36,10 @@ class TwitterService:
         errors = []
         try:
             driver = self.driver_service.setup_driver()
-            # driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
-            #     'source': '''
-            #         Object.defineProperty(navigator, 'webdriver', {
-            #             get: () => undefined
-            #         })
-            #     '''
-            # })
             driver.get(url)
             self.driver_service.login(driver)
             
             self.check_login_success(driver)
-            #self.wait_for_login_page_load(driver)
-
-            
-            print("Waiting for page to load")
-            print("Page loaded")
             driver.maximize_window() 
             for search_query in search_queries:
                 try:
@@ -69,18 +57,18 @@ class TwitterService:
                     logger.error(error_message)
                     errors.append(error_message)
 
-            self.cache_service.set(cache_key, results)
+            if results:  # Only cache if we have results
+                self.cache_service.set(cache_key, results)
             return results, errors
 
         except Exception as e:
             error_message = f"Error in perform_twitter_operation: {str(e)}"
-            print("Encountered error in perform_twitter_operation")
             logger.error(error_message)
             errors.append(error_message)
             return None, errors
         finally:
             if driver:
-                driver.quit()
+                self.driver_service.cleanup_driver(driver)
 
     def perform_channel_search(self, driver, search_query):
         url = f"{self.base_url}/{search_query}"

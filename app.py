@@ -41,6 +41,23 @@ driver_service = DriverService()
 cache_service = CacheService()
 twitter_service = TwitterService(driver_service, cache_service)
 
+def init_app():
+    """Initialize application resources"""
+    logger.info("Initializing services...")
+
+@app.teardown_appcontext
+def cleanup_context(exception=None):
+    """Cleanup resources when the application context ends"""
+    driver_service.cleanup_all_drivers()
+
+# Register cleanup on process termination
+import atexit
+atexit.register(driver_service.cleanup_all_drivers)
+
+# Initialize the app
+with app.app_context():
+    init_app()
+
 # methods for the api
 @app.route('/ChannelResults', methods=['POST'])
 def channel_search_results():
@@ -127,8 +144,15 @@ def reset_cache():
 def health_check():
     try:
         print("Checking health")
-        chrome_version = subprocess.check_output(['google-chrome', '--version']).decode().strip()
-        print("Chrome version: ", chrome_version)
+        chrome_version = "Not checked in local environment"
+        
+        # Only check Chrome version in Azure environment
+        if os.getenv('WEBSITE_HOSTNAME'):
+            try:
+                chrome_version = subprocess.check_output(['google-chrome', '--version']).decode().strip()
+            except Exception as e:
+                chrome_version = f"Chrome version detection failed: {str(e)}"
+
         return jsonify({
             "Success": True,
             "Message": "API is running",
@@ -136,13 +160,15 @@ def health_check():
                 "status": "healthy",
                 "timestamp": datetime.now(UTC).isoformat(),
                 "chrome_version": chrome_version,
-                "cache_stats": cache_service.get_stats(),
                 "python_version": platform.python_version(),
-                "environment": os.getenv('WEBSITE_HOSTNAME', 'local')
+                "environment": os.getenv('WEBSITE_HOSTNAME', 'local'),
+                "platform": platform.system(),
+                "cache_stats": cache_service.get_stats()
             },
             "Errors": None
         })
     except Exception as e:
+        logger.error(f"Health check failed: {str(e)}", exc_info=True)
         return jsonify({
             "Success": False,
             "Message": "Health check failed",

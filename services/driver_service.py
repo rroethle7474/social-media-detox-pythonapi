@@ -12,6 +12,9 @@ from webdriver_manager.chrome import ChromeDriverManager
 logger = logging.getLogger(__name__)
 
 class DriverService:
+    def __init__(self):
+        self.active_drivers = set()
+
     def setup_driver(self):
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument('--headless')
@@ -32,7 +35,26 @@ class DriverService:
         chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
         
         service = Service(ChromeDriverManager().install())
-        return webdriver.Chrome(service=service, options=chrome_options)
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        self.active_drivers.add(driver)
+        return driver
+
+    def cleanup_driver(self, driver):
+        """Safely cleanup a specific driver instance"""
+        if driver:
+            try:
+                driver.quit()
+            except Exception as e:
+                logger.error(f"Error cleaning up driver: {str(e)}")
+            finally:
+                if driver in self.active_drivers:
+                    self.active_drivers.remove(driver)
+
+    def cleanup_all_drivers(self):
+        """Cleanup all active driver instances"""
+        for driver in list(self.active_drivers):
+            self.cleanup_driver(driver)
+        self.active_drivers.clear()
 
     def login(self, driver):
         username = os.getenv('TWITTER_USERNAME')
