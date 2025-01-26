@@ -46,8 +46,7 @@ pkill -f "chrome" || true
 # Create and set permissions for Chrome data directory
 log_message "Setting up Chrome data directory..."
 mkdir -p /home/site/chrome-data
-chmod 755 /home/site/chrome-data
-chown -R root:root /home/site/chrome-data
+chmod 777 /home/site/chrome-data 
 
 log_message "Installing Python dependencies..."
 pip install --no-cache-dir -r requirements.txt

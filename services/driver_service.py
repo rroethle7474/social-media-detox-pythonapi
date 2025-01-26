@@ -9,6 +9,8 @@ import tempfile
 import shutil
 from pathlib import Path
 import time
+import uuid  # Added for unique directory names
+import psutil  # Added for process management
 
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
@@ -19,171 +21,97 @@ class DriverService:
     def __init__(self):
         self.active_drivers = set()
         self.temp_dirs = set()
-        # Clean up any existing Chrome user data directories at startup
         self._cleanup_existing_chrome_dirs()
 
     def _kill_chrome_processes(self):
-        """Forcefully kill all Chrome-related processes"""
+        """Forcefully kill all Chrome-related processes with improved reliability"""
+        logger.info("Starting Chrome process cleanup")
         try:
-            import psutil
-            for proc in psutil.process_iter(['name', 'pid', 'status']):
+            for proc in psutil.process_iter(['pid', 'name', 'status']):
                 try:
-                    # Check for both 'chrome' and 'chromium' processes
-                    if any(browser in proc.info['name'].lower() for browser in ['chrome', 'chromium']):
-                        logger.info(f"Found Chrome process: PID={proc.info['pid']}, Status={proc.info['status']}")
+                    if any(browser in proc.info['name'].lower() for browser in ['chrome', 'chromium', 'chromedriver']):
+                        logger.info(f"Terminating process: {proc.info}")
                         try:
-                            # First try SIGTERM
-                            proc.terminate()
-                            try:
-                                proc.wait(timeout=3)
-                            except psutil.TimeoutExpired:
-                                # If SIGTERM didn't work, use SIGKILL
-                                logger.warning(f"Process {proc.info['pid']} didn't terminate, using SIGKILL")
-                                proc.kill()
-                                proc.wait(timeout=3)
+                            proc.kill()
+                            # Wait for process to terminate
+                            gone, alive = psutil.wait_procs([proc], timeout=5)
+                            for p in alive:
+                                logger.warning(f"Failed to kill process {p.pid}, using SIGKILL")
+                                os.kill(p.pid, 9)
                         except psutil.NoSuchProcess:
-                            logger.info(f"Process {proc.info['pid']} already terminated")
-                        except Exception as e:
-                            logger.error(f"Failed to kill process {proc.info['pid']}: {str(e)}")
-                            
-                        # Double check if process is really gone
-                        try:
-                            if psutil.pid_exists(proc.info['pid']):
-                                logger.error(f"Process {proc.info['pid']} still exists after kill attempt")
-                            else:
-                                logger.info(f"Successfully terminated process {proc.info['pid']}")
-                        except:
-                            pass
-                except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
-                    logger.warning(f"Error accessing process: {str(e)}")
-        except ImportError:
-            logger.warning("psutil not available for Chrome process cleanup")
+                            continue
+                except (psutil.NoSuchProcess, psutil.AccessDenied, KeyError):
+                    continue
+            logger.info("Chrome process cleanup completed")
         except Exception as e:
-            logger.error(f"Error during Chrome process cleanup: {str(e)}", exc_info=True)
+            logger.error(f"Error during Chrome process cleanup: {str(e)}")
 
     def _cleanup_existing_chrome_dirs(self):
-        """Clean up any existing Chrome user data directories and processes in the temp folder"""
+        """Clean up any existing Chrome user data directories"""
+        self._kill_chrome_processes()
         try:
-            # First, kill all Chrome processes
-            self._kill_chrome_processes()
-            
-            # Then clean up directories
-            temp_root = tempfile.gettempdir()
+            temp_root = '/home/site/chrome-data'  # Fixed path for Azure environment
             logger.info(f"Cleaning up Chrome directories in {temp_root}")
             
-            # Look for both Chrome user data directories and any other Chrome-related temp files
-            chrome_patterns = [
-                'chrome_user_data_*',
-                'chrome-*',
-                'chromium-*',
-                '.com.google.chrome.*',
-                'chrome_*',
-                '*Chrome*'
-            ]
-            
-            import glob
-            for pattern in chrome_patterns:
-                pattern_path = os.path.join(temp_root, pattern)
-                for item_path in glob.glob(pattern_path):
-                    if os.path.isdir(item_path):
-                        try:
-                            logger.info(f"Removing Chrome-related directory: {item_path}")
+            if os.path.exists(temp_root):
+                for item in os.listdir(temp_root):
+                    item_path = os.path.join(temp_root, item)
+                    try:
+                        if os.path.isdir(item_path):
                             shutil.rmtree(item_path, ignore_errors=True)
-                        except Exception as e:
-                            logger.warning(f"Failed to remove Chrome directory {item_path}: {str(e)}")
-                    elif os.path.isfile(item_path):
-                        try:
-                            logger.info(f"Removing Chrome-related file: {item_path}")
+                            logger.info(f"Removed directory: {item_path}")
+                        else:
                             os.remove(item_path)
-                        except Exception as e:
-                            logger.warning(f"Failed to remove Chrome file {item_path}: {str(e)}")
-            
-            # Verify cleanup
-            remaining_chrome_dirs = []
-            for pattern in chrome_patterns:
-                pattern_path = os.path.join(temp_root, pattern)
-                remaining_chrome_dirs.extend(glob.glob(pattern_path))
-            
-            if remaining_chrome_dirs:
-                logger.warning(f"Some Chrome directories could not be removed: {remaining_chrome_dirs}")
-            else:
-                logger.info("Chrome directory cleanup completed successfully")
-                
+                            logger.info(f"Removed file: {item_path}")
+                    except Exception as e:
+                        logger.warning(f"Error removing {item_path}: {str(e)}")
         except Exception as e:
-            logger.error(f"Error during Chrome cleanup: {str(e)}", exc_info=True)
+            logger.error(f"Directory cleanup error: {str(e)}")
 
     def setup_driver(self):
-        # Kill any existing Chrome processes before starting
+        """Create new Chrome driver instance with unique user directory"""
         self._kill_chrome_processes()
-        
         chrome_options = webdriver.ChromeOptions()
         
-        # Use dedicated Chrome data directory with unique subdirectory
+        # Configure Chrome user directory
         base_dir = '/home/site/chrome-data'
-        temp_dir = os.path.join(base_dir, f'profile_{int(time.time())}_{os.getpid()}')
+        temp_dir = os.path.join(base_dir, f'profile_{uuid.uuid4()}')  # Unique UUID-based directory
         os.makedirs(temp_dir, exist_ok=True)
-        logger.info(f"Created new Chrome user data directory: {temp_dir}")
         
-        # Verify the directory is empty and accessible
-        if os.path.exists(temp_dir):
-            contents = os.listdir(temp_dir)
-            if contents:
-                logger.warning(f"New temp directory is not empty: {contents}")
-            
-            # Verify permissions
-            try:
-                test_file = os.path.join(temp_dir, 'test.txt')
-                with open(test_file, 'w') as f:
-                    f.write('test')
-                os.remove(test_file)
-                logger.info("Successfully verified temp directory permissions")
-            except Exception as e:
-                logger.error(f"Permission test failed on temp directory: {str(e)}")
-        
+        # Set directory permissions (crucial for Azure)
+        try:
+            os.chmod(temp_dir, 0o777)
+            logger.info(f"Set permissions for directory: {temp_dir}")
+        except Exception as e:
+            logger.error(f"Error setting directory permissions: {str(e)}")
+
         self.temp_dirs.add(temp_dir)
-        
+        logger.info(f"Created new Chrome profile: {temp_dir}")
+
         # Chrome configuration
         chrome_options.add_argument(f'--user-data-dir={temp_dir}')
-        chrome_options.add_argument('--remote-debugging-port=0')  # Use random port
-        chrome_options.add_argument('--no-first-run')
-        chrome_options.add_argument('--no-service-autorun')
-        chrome_options.add_argument('--password-store=basic')
-        chrome_options.add_argument('--no-default-browser-check')
-        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--remote-debugging-port=0')
         chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-gpu')
-        chrome_options.add_argument('--ignore-certificate-errors')
-        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-        chrome_options.add_argument('--disable-background-networking')
-        chrome_options.add_argument('--disable-default-apps')
-        chrome_options.add_argument('--disable-extensions')
-        chrome_options.add_argument('--disable-sync')
-        chrome_options.add_argument('--disable-translate')
-        chrome_options.add_argument('--metrics-recording-only')
-        chrome_options.add_argument('--mute-audio')
-        chrome_options.add_argument('--no-first-run')
-        chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
-        chrome_options.add_experimental_option('useAutomationExtension', False)
-        chrome_options.add_argument('--disable-notifications')
-        chrome_options.add_argument('--disable-popup-blocking')
-        chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-        
+        chrome_options.add_argument('--window-size=1920,1080')
+        chrome_options.add_argument('--headless=new')  # Enable headless mode for production
+
         try:
             service = Service(ChromeDriverManager().install())
-            logger.info("Creating new Chrome driver instance")
             driver = webdriver.Chrome(service=service, options=chrome_options)
             self.active_drivers.add(driver)
-            logger.info("Successfully created new Chrome driver instance")
+            logger.info("Chrome driver initialized successfully")
             return driver
         except Exception as e:
-            logger.error(f"Failed to create Chrome driver: {str(e)}", exc_info=True)
-            # Clean up the temp directory if driver creation failed
+            logger.error(f"Driver initialization failed: {str(e)}")
+            # Cleanup failed instance
             try:
                 shutil.rmtree(temp_dir, ignore_errors=True)
-                self.temp_dirs.remove(temp_dir)
-                logger.info(f"Cleaned up temp directory after failed driver creation: {temp_dir}")
+                self.temp_dirs.discard(temp_dir)
+                logger.info(f"Cleaned up failed driver directory: {temp_dir}")
             except Exception as cleanup_error:
-                logger.error(f"Error cleaning up temp directory: {str(cleanup_error)}")
+                logger.error(f"Directory cleanup error: {str(cleanup_error)}")
             raise
 
     def cleanup_driver(self, driver):
@@ -191,24 +119,25 @@ class DriverService:
         if driver:
             try:
                 driver.quit()
+                logger.info("Driver quit successfully")
             except Exception as e:
-                logger.error(f"Error cleaning up driver: {str(e)}")
+                logger.error(f"Error quitting driver: {str(e)}")
             finally:
-                # Kill any remaining Chrome processes
                 self._kill_chrome_processes()
+                self.active_drivers.discard(driver)
                 
-                if driver in self.active_drivers:
-                    self.active_drivers.remove(driver)
-                # Clean up the temporary directory after the driver is quit
+                # Cleanup associated directories
                 for temp_dir in list(self.temp_dirs):
                     try:
                         shutil.rmtree(temp_dir, ignore_errors=True)
-                        self.temp_dirs.remove(temp_dir)
+                        self.temp_dirs.discard(temp_dir)
+                        logger.info(f"Cleaned up directory: {temp_dir}")
                     except Exception as e:
-                        logger.error(f"Error cleaning up temporary directory {temp_dir}: {str(e)}")
+                        logger.error(f"Directory cleanup error: {str(e)}")
 
     def cleanup_all_drivers(self):
-        """Cleanup all active driver instances"""
+        """Cleanup all driver instances"""
+        logger.info("Cleaning up all drivers")
         for driver in list(self.active_drivers):
             self.cleanup_driver(driver)
         self.active_drivers.clear()
