@@ -143,7 +143,8 @@ def search_results():
                 "Errors": ["No search queries provided"]
             }), 400
         
-        result, errors = twitter_service.perform_twitter_operation(url, search_queries, 'search', isDefault)
+        with request_lock:  # Ensure only one request uses Chrome at a time
+            result, errors = twitter_service.perform_twitter_operation(url, search_queries, 'search', isDefault)
         success = bool(result)
         return jsonify({
             "Success": success,
@@ -152,7 +153,7 @@ def search_results():
             "Errors": errors if errors else None
         })
     except Exception as e:
-        print("Encountered error in search_results")
+        logger.error(f"Error in search_results: {str(e)}", exc_info=True)  # Add detailed logging
         return jsonify({
             "Success": False,
             "Message": "An error occurred during search",

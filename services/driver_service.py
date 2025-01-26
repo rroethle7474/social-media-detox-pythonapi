@@ -41,22 +41,54 @@ class DriverService:
             logger.error(f"Error during initial Chrome directory cleanup: {str(e)}")
 
     def setup_driver(self):
+        # Check for existing Chrome processes
+        try:
+            import psutil
+            chrome_processes = [p for p in psutil.process_iter(['name']) if 'chrome' in p.info['name'].lower()]
+            if chrome_processes:
+                logger.warning(f"Found {len(chrome_processes)} existing Chrome processes before starting new one")
+                for proc in chrome_processes:
+                    logger.info(f"Existing Chrome process: {proc.pid}")
+        except ImportError:
+            logger.warning("psutil not available for Chrome process checking")
+        except Exception as e:
+            logger.warning(f"Error checking Chrome processes: {str(e)}")
+
         chrome_options = webdriver.ChromeOptions()
         # Create a unique temporary directory for user data
         temp_dir = tempfile.mkdtemp(prefix='chrome_user_data_')
         logger.info(f"Created new Chrome user data directory: {temp_dir}")
+        
+        # Verify the directory is empty and accessible
+        if os.path.exists(temp_dir):
+            contents = os.listdir(temp_dir)
+            if contents:
+                logger.warning(f"New temp directory is not empty: {contents}")
+            
+            # Verify permissions
+            try:
+                test_file = os.path.join(temp_dir, 'test.txt')
+                with open(test_file, 'w') as f:
+                    f.write('test')
+                os.remove(test_file)
+                logger.info("Successfully verified temp directory permissions")
+            except Exception as e:
+                logger.error(f"Permission test failed on temp directory: {str(e)}")
+        
         self.temp_dirs.add(temp_dir)
         chrome_options.add_argument(f'--user-data-dir={temp_dir}')
         
-        # chrome_options.add_argument('--headless')
+        # Force clean start
+        chrome_options.add_argument('--no-first-run')
+        chrome_options.add_argument('--no-service-autorun')
+        chrome_options.add_argument('--password-store=basic')
+        chrome_options.add_argument('--no-default-browser-check')
+        
+        # Existing options
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
-        
-        # Version mismatch handling
         chrome_options.add_argument('--disable-gpu')
         chrome_options.add_argument('--ignore-certificate-errors')
-        
-        # Stealth settings
         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
         chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
         chrome_options.add_experimental_option('useAutomationExtension', False)
@@ -64,10 +96,22 @@ class DriverService:
         chrome_options.add_argument('--disable-popup-blocking')
         chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
         
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=chrome_options)
-        self.active_drivers.add(driver)
-        return driver
+        try:
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+            self.active_drivers.add(driver)
+            logger.info("Successfully created new Chrome driver instance")
+            return driver
+        except Exception as e:
+            logger.error(f"Failed to create Chrome driver: {str(e)}", exc_info=True)
+            # Clean up the temp directory if driver creation failed
+            try:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                self.temp_dirs.remove(temp_dir)
+                logger.info(f"Cleaned up temp directory after failed driver creation: {temp_dir}")
+            except Exception as cleanup_error:
+                logger.error(f"Error cleaning up temp directory: {str(cleanup_error)}")
+            raise
 
     def cleanup_driver(self, driver):
         """Safely cleanup a specific driver instance"""
