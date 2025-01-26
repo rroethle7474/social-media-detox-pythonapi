@@ -27,20 +27,20 @@ from services.twitter_service import TwitterService
 log_handlers = [logging.StreamHandler()]
 
 # Determine log file path based on environment
-if os.getenv('WEBSITE_HOSTNAME'):  # Running in Azure
-    log_path = '/home/LogFiles/app.log'
-else:  # Running locally
-    log_dir = 'logs'
-    os.makedirs(log_dir, exist_ok=True)
-    log_path = os.path.join(log_dir, 'app.log')
+# if os.getenv('WEBSITE_HOSTNAME'):  # Running in Azure
+#     log_path = '/home/LogFiles/app.log'
+# else:  # Running locally
+#     log_dir = 'logs'
+#     os.makedirs(log_dir, exist_ok=True)
+#     log_path = os.path.join(log_dir, 'app.log')
 
-log_handlers.append(logging.FileHandler(log_path))
+# log_handlers.append(logging.FileHandler(log_path))
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=log_handlers
-)
+# logging.basicConfig(
+#     level=logging.DEBUG,
+#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+#     handlers=log_handlers
+# )
 logger = logging.getLogger(__name__)
 
 # Load environment variables
@@ -50,9 +50,9 @@ app = Flask(__name__)
 CORS(app)
 
 # Production configurations
-app.config['PROPAGATE_EXCEPTIONS'] = True
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
-app.config['JSON_SORT_KEYS'] = False
+# app.config['PROPAGATE_EXCEPTIONS'] = True
+# app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+# app.config['JSON_SORT_KEYS'] = False
 
 # Initialize services
 try:
