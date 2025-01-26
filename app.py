@@ -17,6 +17,7 @@ from datetime import datetime, UTC
 import json
 from cachetools import TTLCache
 from selenium.webdriver.common.action_chains import ActionChains
+import threading
 
 from services.cache_service import CacheService
 from services.driver_service import DriverService
@@ -54,37 +55,13 @@ CORS(app)
 # app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 # app.config['JSON_SORT_KEYS'] = False
 
-# Initialize services
-try:
-    driver_service = DriverService()
-    cache_service = CacheService()
-    twitter_service = TwitterService(driver_service, cache_service)
-    logger.info("Services initialized successfully")
-except Exception as e:
-    logger.error(f"Error initializing services: {str(e)}")
-    raise
+# Initialize services at module level
+cache_service = CacheService()
+driver_service = DriverService()
+twitter_service = TwitterService(driver_service, cache_service)
 
-@app.route('/')
-def root():
-    """Root endpoint for health checks"""
-    try:
-        return jsonify({
-            "Success": True,
-            "Message": "TimeHealer API is running",
-            "Data": {
-                "status": "healthy",
-                "timestamp": datetime.now(UTC).isoformat()
-            },
-            "Errors": None
-        })
-    except Exception as e:
-        logger.error(f"Error in root endpoint: {str(e)}")
-        return jsonify({
-            "Success": False,
-            "Message": "Error in health check",
-            "Data": None,
-            "Errors": [str(e)]
-        }), 500
+# Add request lock to prevent concurrent Chrome sessions
+request_lock = threading.Lock()
 
 # Add startup readiness check
 ready = False
@@ -134,12 +111,13 @@ def channel_search_results():
                 "Errors": ["No search queries provided"]
             }), 400
         
-        result, errors = twitter_service.perform_twitter_operation(url, search_queries, 'channel', isDefault)
-        success = bool(result)
+        with request_lock:  # Ensure only one request uses Chrome at a time
+            results, errors = twitter_service.perform_twitter_operation(url, search_queries, 'channel', isDefault)
+        success = bool(results)
         return jsonify({
             "Success": success,
             "Message": "Channel search completed" if len(errors) == 0 else "Channel search completed with errors",
-            "Data": result if result else None,
+            "Data": results if results else None,
             "Errors": errors if errors else None
         })
     except Exception as e:
