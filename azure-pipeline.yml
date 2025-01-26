@@ -66,29 +66,6 @@ stages:
         TWITTER_PASSWORD: $(TWITTER_PASSWORD)
         TWITTER_PHONE_NUMBER: $(TWITTER_PHONE_NUMBER)
 
-    # Create startup script
-    - task: Bash@3
-      inputs:
-        targetType: 'inline'
-        script: |
-          cat > $(Build.ArtifactStagingDirectory)/startup.sh << 'EOF'
-          #!/bin/bash
-          set -e  # Exit on any error
-
-          echo "Setting up environment..."
-          if [[ $WEBSITE_HOSTNAME == *"-test"* ]]; then
-              cp .env.test .env
-          else
-              cp .env.prod .env
-          fi
-          echo "Startup Latest"
-          echo "Starting gunicorn..."
-          exec gunicorn --bind=0.0.0.0 --timeout 600 app:app
-          EOF
-
-          chmod +x $(Build.ArtifactStagingDirectory)/startup.sh
-      displayName: 'Create startup script'
-
     # Copy project files
     - task: CopyFiles@2
       inputs:
@@ -99,6 +76,7 @@ stages:
           .env.example
           models/**
           services/**
+          startup.sh
         TargetFolder: '$(Build.ArtifactStagingDirectory)'
       displayName: 'Copy project files'
 
@@ -140,7 +118,7 @@ stages:
               package: '$(Pipeline.Workspace)/drop/app.zip'
               appType: 'webAppLinux'
               runtimeStack: 'PYTHON|3.12'
-              startUpCommand: '/bin/bash startup.sh'
+              startUpCommand: 'bash startup.sh'
 
 - stage: DeployProd
   displayName: 'Deploy to Production'
@@ -162,4 +140,4 @@ stages:
               package: '$(Pipeline.Workspace)/drop/app.zip'
               appType: 'webAppLinux'
               runtimeStack: 'PYTHON|3.12'
-              startUpCommand: '/bin/bash startup.sh'
+              startUpCommand: 'bash startup.sh'
