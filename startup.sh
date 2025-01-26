@@ -12,7 +12,22 @@ echo "Updating package list..."
 apt-get update
 
 echo "Installing Chrome..."
+# Prevent services from starting automatically during install
+echo "exit 101" > /usr/sbin/policy-rc.d
+chmod +x /usr/sbin/policy-rc.d
 apt-get install -y google-chrome-stable
+rm /usr/sbin/policy-rc.d
+
+# Disable Chrome's automatic updating and background services
+echo "Disabling Chrome services..."
+if [ -f /etc/default/google-chrome ]; then
+    echo "repo_add_once=false" >> /etc/default/google-chrome
+fi
+
+# Kill any existing Chrome processes
+echo "Cleaning up any existing Chrome processes..."
+pkill chrome || true
+pkill -f "chrome" || true
 
 echo "Installing Python dependencies..."
 pip install --no-cache-dir -r requirements.txt
