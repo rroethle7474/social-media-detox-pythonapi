@@ -6,15 +6,17 @@ set -x
 
 echo "Starting startup.sh with enhanced logging..."
 
-# Create log directories
-mkdir -p /home/LogFiles/startup
-mkdir -p /home/LogFiles/gunicorn
-mkdir -p /home/LogFiles/chrome
-chmod 777 /home/LogFiles/chrome
+# Create log directories in persisted location
+mkdir -p /home/site/wwwroot/logs/startup
+mkdir -p /home/site/wwwroot/logs/gunicorn
+mkdir -p /home/site/wwwroot/logs/chrome
+chmod 777 /home/site/wwwroot/logs/chrome
+chmod 777 /home/site/wwwroot/logs/startup
+chmod 777 /home/site/wwwroot/logs/gunicorn
 
 # Function to log messages
 log_message() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a /home/LogFiles/startup/startup.log
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a /home/site/wwwroot/logs/startup/startup.log
 }
 
 # Log environment information
@@ -64,8 +66,8 @@ log_message "Chrome version: $chrome_version"
 
 # Create and set permissions for Chrome data directory
 log_message "Setting up Chrome data directory..."
-mkdir -p /home/site/chrome-data
-chmod 777 /home/site/chrome-data 
+mkdir -p /home/site/wwwroot/chrome-data
+chmod 777 /home/site/wwwroot/chrome-data 
 
 log_message "Installing Python dependencies..."
 $python_cmd -m pip install --upgrade pip
@@ -92,9 +94,9 @@ exec gunicorn \
     --threads 2 \
     --worker-class sync \
     --log-level debug \
-    --access-logfile /home/LogFiles/gunicorn/access.log \
-    --error-logfile /home/LogFiles/gunicorn/error.log \
+    --access-logfile /home/site/wwwroot/logs/gunicorn/access.log \
+    --error-logfile /home/site/wwwroot/logs/gunicorn/error.log \
     --capture-output \
     --log-file=- \
     --pythonpath "${PWD}" \
-    app:app 2>&1 | tee -a /home/LogFiles/startup/startup.log
+    app:app 2>&1 | tee -a /home/site/wwwroot/logs/startup/startup.log

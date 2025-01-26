@@ -178,6 +178,11 @@ def reset_cache():
             "Data": None,
             "Errors": [str(e)]
         }), 500
+        
+@app.route('/api/health', methods=['GET'])
+def api_health_check():
+    """Azure Web Apps default health check endpoint"""
+    return health_check()
 
 @app.route('/health', methods=['GET'])
 def health_check():
