@@ -12,13 +12,29 @@ mkdir -p /home/LogFiles/gunicorn
 mkdir -p /home/LogFiles/chrome
 chmod 777 /home/LogFiles/chrome
 
-# Add debug logging for directory permissions
-ls -la /home/site/chrome-data > /home/LogFiles/chrome-dir-permissions.txt
-
 # Function to log messages
 log_message() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a /home/LogFiles/startup/startup.log
 }
+
+# Log environment information
+log_message "Environment Information:"
+log_message "PORT: $PORT"
+log_message "WEBSITES_PORT: $WEBSITES_PORT"
+log_message "WEBSITE_HOSTNAME: $WEBSITE_HOSTNAME"
+log_message "Current directory: $(pwd)"
+log_message "Directory contents: $(ls -la)"
+log_message "Python version: $(python3 --version)"
+log_message "Pip version: $(pip3 --version)"
+
+# Ensure we're using Python 3.12
+if command -v python3.12 &> /dev/null; then
+    log_message "Using Python 3.12"
+    python_cmd="python3.12"
+else
+    log_message "Python 3.12 not found, using default Python"
+    python_cmd="python3"
+fi
 
 log_message "Adding Chrome repository..."
 if ! curl -sS -o - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -; then
@@ -37,16 +53,14 @@ chmod +x /usr/sbin/policy-rc.d
 apt-get install -y google-chrome-stable
 rm /usr/sbin/policy-rc.d
 
-# Disable Chrome's automatic updating and background services
-log_message "Disabling Chrome services..."
-if [ -f /etc/default/google-chrome ]; then
-    echo "repo_add_once=false" >> /etc/default/google-chrome
+# Verify Chrome installation
+if ! which google-chrome > /dev/null; then
+    log_message "Chrome installation failed - not found in PATH"
+    exit 1
 fi
 
-# Kill any existing Chrome processes
-log_message "Cleaning up any existing Chrome processes..."
-pkill chrome || true
-pkill -f "chrome" || true
+chrome_version=$(google-chrome --version)
+log_message "Chrome version: $chrome_version"
 
 # Create and set permissions for Chrome data directory
 log_message "Setting up Chrome data directory..."
@@ -54,7 +68,8 @@ mkdir -p /home/site/chrome-data
 chmod 777 /home/site/chrome-data 
 
 log_message "Installing Python dependencies..."
-pip install --no-cache-dir -r requirements.txt
+$python_cmd -m pip install --upgrade pip
+$python_cmd -m pip install --no-cache-dir -r requirements.txt
 
 log_message "Setting up environment..."
 if [[ $WEBSITE_HOSTNAME == *"-test"* ]]; then
@@ -65,13 +80,13 @@ else
     log_message "Copied prod environment file"
 fi
 
-log_message "Starting gunicorn on port 8000..."
-log_message "Current directory: $(pwd)"
-log_message "Files in current directory: $(ls -la)"
+# Use WEBSITES_PORT if available, otherwise fallback to 8000
+PORT="${WEBSITES_PORT:-8000}"
+log_message "Starting gunicorn on port $PORT..."
 
 # Start with minimal configuration first
 exec gunicorn \
-    --bind=0.0.0.0:8000 \
+    --bind="0.0.0.0:${PORT}" \
     --timeout 120 \
     --workers 1 \
     --threads 2 \
@@ -81,4 +96,5 @@ exec gunicorn \
     --error-logfile /home/LogFiles/gunicorn/error.log \
     --capture-output \
     --log-file=- \
+    --pythonpath "${PWD}" \
     app:app 2>&1 | tee -a /home/LogFiles/startup/startup.log
