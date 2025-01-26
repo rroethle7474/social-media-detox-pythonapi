@@ -18,11 +18,33 @@ class DriverService:
     def __init__(self):
         self.active_drivers = set()
         self.temp_dirs = set()
+        # Clean up any existing Chrome user data directories at startup
+        self._cleanup_existing_chrome_dirs()
+
+    def _cleanup_existing_chrome_dirs(self):
+        """Clean up any existing Chrome user data directories in the temp folder"""
+        try:
+            temp_root = tempfile.gettempdir()
+            logger.info(f"Cleaning up Chrome directories in {temp_root}")
+            for item in os.listdir(temp_root):
+                item_path = os.path.join(temp_root, item)
+                if os.path.isdir(item_path):
+                    # Look for directories that might be Chrome user data dirs
+                    chrome_files = ['Default', 'First Run', 'Local State']
+                    if any(os.path.exists(os.path.join(item_path, f)) for f in chrome_files):
+                        try:
+                            logger.info(f"Removing existing Chrome directory: {item_path}")
+                            shutil.rmtree(item_path, ignore_errors=True)
+                        except Exception as e:
+                            logger.warning(f"Failed to remove existing Chrome directory {item_path}: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error during initial Chrome directory cleanup: {str(e)}")
 
     def setup_driver(self):
         chrome_options = webdriver.ChromeOptions()
         # Create a unique temporary directory for user data
-        temp_dir = tempfile.mkdtemp()
+        temp_dir = tempfile.mkdtemp(prefix='chrome_user_data_')
+        logger.info(f"Created new Chrome user data directory: {temp_dir}")
         self.temp_dirs.add(temp_dir)
         chrome_options.add_argument(f'--user-data-dir={temp_dir}')
         
