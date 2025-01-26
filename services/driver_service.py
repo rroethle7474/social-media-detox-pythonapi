@@ -5,6 +5,9 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import os
 import logging
+import tempfile
+import shutil
+from pathlib import Path
 
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
@@ -14,9 +17,15 @@ logger = logging.getLogger(__name__)
 class DriverService:
     def __init__(self):
         self.active_drivers = set()
+        self.temp_dirs = set()
 
     def setup_driver(self):
         chrome_options = webdriver.ChromeOptions()
+        # Create a unique temporary directory for user data
+        temp_dir = tempfile.mkdtemp()
+        self.temp_dirs.add(temp_dir)
+        chrome_options.add_argument(f'--user-data-dir={temp_dir}')
+        
         # chrome_options.add_argument('--headless')
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
@@ -48,6 +57,13 @@ class DriverService:
             finally:
                 if driver in self.active_drivers:
                     self.active_drivers.remove(driver)
+                # Clean up the temporary directory after the driver is quit
+                for temp_dir in list(self.temp_dirs):
+                    try:
+                        shutil.rmtree(temp_dir, ignore_errors=True)
+                        self.temp_dirs.remove(temp_dir)
+                    except Exception as e:
+                        logger.error(f"Error cleaning up temporary directory {temp_dir}: {str(e)}")
 
     def cleanup_all_drivers(self):
         """Cleanup all active driver instances"""
