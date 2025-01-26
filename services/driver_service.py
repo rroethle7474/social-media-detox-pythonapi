@@ -170,7 +170,7 @@ class DriverService:
         
         try:
             service = Service(ChromeDriverManager().install())
-            print("ABOUT TO HAVE AN ERROR")
+            logger.info("Creating new Chrome driver instance")
             driver = webdriver.Chrome(service=service, options=chrome_options)
             self.active_drivers.add(driver)
             logger.info("Successfully created new Chrome driver instance")
