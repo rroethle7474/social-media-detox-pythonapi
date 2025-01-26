@@ -9,6 +9,12 @@ echo "Starting startup.sh with enhanced logging..."
 # Create log directories
 mkdir -p /home/LogFiles/startup
 mkdir -p /home/LogFiles/gunicorn
+mkdir -p /home/LogFiles/chrome
+chmod 777 /home/LogFiles/chrome
+
+# Add debug logging for directory permissions
+ls -la /home/site/chrome-data > /home/LogFiles/chrome-dir-permissions.txt
+
 
 # Function to log messages
 log_message() {

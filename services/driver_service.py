@@ -89,13 +89,17 @@ class DriverService:
         logger.info(f"Created new Chrome profile: {temp_dir}")
 
         # Chrome configuration
-        chrome_options.add_argument(f'--user-data-dir={temp_dir}')
+        # chrome_options.add_argument(f'--user-data-dir={temp_dir}')
         chrome_options.add_argument('--remote-debugging-port=0')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-gpu')
         chrome_options.add_argument('--window-size=1920,1080')
-        chrome_options.add_argument('--headless=new')  # Enable headless mode for production
+        chrome_options.add_argument('--headless=new')  # Enable headless mode for productionchrome_options.add_argument('--enable-logging')  # Enables Chrome's internal logging
+        
+        chrome_options.add_argument('--v=1')  # Verbose logging level
+        chrome_options.add_argument('--log-path=/home/LogFiles/chrome/chromedriver.log')
+        chrome_options.add_argument('--user-data-dir=/dev/null')  # Disable profile persistenc
 
         try:
             service = Service(ChromeDriverManager().install())
