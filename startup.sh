@@ -15,7 +15,6 @@ chmod 777 /home/LogFiles/chrome
 # Add debug logging for directory permissions
 ls -la /home/site/chrome-data > /home/LogFiles/chrome-dir-permissions.txt
 
-
 # Function to log messages
 log_message() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a /home/LogFiles/startup/startup.log
@@ -66,19 +65,20 @@ else
     log_message "Copied prod environment file"
 fi
 
-log_message "Adding startup delay for health checks..."
-sleep 5
-
 log_message "Starting gunicorn on port 8000..."
+log_message "Current directory: $(pwd)"
+log_message "Files in current directory: $(ls -la)"
+
+# Start with minimal configuration first
 exec gunicorn \
     --bind=0.0.0.0:8000 \
-    --timeout 600 \
-    --workers 2 \
-    --threads 4 \
-    --worker-class gthread \
+    --timeout 120 \
+    --workers 1 \
+    --threads 2 \
+    --worker-class sync \
     --log-level debug \
     --access-logfile /home/LogFiles/gunicorn/access.log \
     --error-logfile /home/LogFiles/gunicorn/error.log \
     --capture-output \
-    --preload \
+    --log-file=- \
     app:app 2>&1 | tee -a /home/LogFiles/startup/startup.log

@@ -72,9 +72,10 @@ class DriverService:
         """Create new Chrome driver instance with unique user directory"""
         self._kill_chrome_processes()
         chrome_options = webdriver.ChromeOptions()
-        
+        logger.info("CHROME OPTIONS", chrome_options)
         # Configure Chrome user directory
         base_dir = '/home/site/chrome-data'
+        logging.info("BASE DIR", base_dir)
         temp_dir = os.path.join(base_dir, f'profile_{uuid.uuid4()}')  # Unique UUID-based directory
         os.makedirs(temp_dir, exist_ok=True)
         
