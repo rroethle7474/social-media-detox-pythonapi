@@ -8,6 +8,7 @@ import logging
 import tempfile
 import shutil
 from pathlib import Path
+import time
 
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
@@ -115,24 +116,12 @@ class DriverService:
         # Kill any existing Chrome processes before starting
         self._kill_chrome_processes()
         
-        # Check for any remaining Chrome processes
-        try:
-            import psutil
-            chrome_processes = [p for p in psutil.process_iter(['name']) if 'chrome' in p.info['name'].lower()]
-            if chrome_processes:
-                logger.error(f"Found {len(chrome_processes)} Chrome processes after cleanup attempt")
-                for proc in chrome_processes:
-                    logger.error(f"Remaining Chrome process: {proc.pid}")
-                raise Exception("Failed to clean up existing Chrome processes")
-        except ImportError:
-            logger.warning("psutil not available for Chrome process checking")
-        except Exception as e:
-            if "Failed to clean up existing Chrome processes" not in str(e):
-                logger.warning(f"Error checking Chrome processes: {str(e)}")
-
         chrome_options = webdriver.ChromeOptions()
-        # Create a unique temporary directory for user data
-        temp_dir = tempfile.mkdtemp(prefix='chrome_user_data_')
+        
+        # Use dedicated Chrome data directory with unique subdirectory
+        base_dir = '/home/site/chrome-data'
+        temp_dir = os.path.join(base_dir, f'profile_{int(time.time())}_{os.getpid()}')
+        os.makedirs(temp_dir, exist_ok=True)
         logger.info(f"Created new Chrome user data directory: {temp_dir}")
         
         # Verify the directory is empty and accessible
@@ -152,20 +141,27 @@ class DriverService:
                 logger.error(f"Permission test failed on temp directory: {str(e)}")
         
         self.temp_dirs.add(temp_dir)
-        chrome_options.add_argument(f'--user-data-dir={temp_dir}')
         
-        # Force clean start
+        # Chrome configuration
+        chrome_options.add_argument(f'--user-data-dir={temp_dir}')
+        chrome_options.add_argument('--remote-debugging-port=0')  # Use random port
         chrome_options.add_argument('--no-first-run')
         chrome_options.add_argument('--no-service-autorun')
         chrome_options.add_argument('--password-store=basic')
         chrome_options.add_argument('--no-default-browser-check')
-        
-        # Existing options
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-gpu')
         chrome_options.add_argument('--ignore-certificate-errors')
         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+        chrome_options.add_argument('--disable-background-networking')
+        chrome_options.add_argument('--disable-default-apps')
+        chrome_options.add_argument('--disable-extensions')
+        chrome_options.add_argument('--disable-sync')
+        chrome_options.add_argument('--disable-translate')
+        chrome_options.add_argument('--metrics-recording-only')
+        chrome_options.add_argument('--mute-audio')
+        chrome_options.add_argument('--no-first-run')
         chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
         chrome_options.add_experimental_option('useAutomationExtension', False)
         chrome_options.add_argument('--disable-notifications')
