@@ -89,6 +89,14 @@ class DriverService:
         self.temp_dirs.add(temp_dir)
         logger.info(f"Created new Chrome profile: {temp_dir}")
 
+        # Anti-detection measures
+        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        chrome_options.add_experimental_option('useAutomationExtension', False)
+        
+        # Set a realistic user agent for Windows 10 and latest Chrome
+        chrome_options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36')
+
         # Chrome configuration
         chrome_options.add_argument(f'--user-data-dir={temp_dir}')
         chrome_options.add_argument('--remote-debugging-port=0')
@@ -100,10 +108,24 @@ class DriverService:
         chrome_options.add_argument('--enable-logging')  # Enables Chrome's internal logging
         chrome_options.add_argument('--v=1')  # Verbose logging level
         chrome_options.add_argument(f'--log-path=/home/site/wwwroot/logs/chrome/chromedriver.log')
+        
+        # Additional options to make the browser appear more realistic
+        chrome_options.add_argument('--disable-notifications')
+        chrome_options.add_argument('--lang=en-US,en')
+        chrome_options.add_argument('--start-maximized')
 
         try:
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=chrome_options)
+            
+            # Execute CDP commands to prevent detection
+            driver.execute_cdp_cmd('Network.setUserAgentOverride', {
+                "userAgent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+            })
+            
+            # Execute JavaScript to prevent detection
+            driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            
             self.active_drivers.add(driver)
             logger.info("Chrome driver initialized successfully")
             return driver
