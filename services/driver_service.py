@@ -105,6 +105,10 @@ class DriverService:
         chrome_options.add_argument('--disable-gpu')
         chrome_options.add_argument('--window-size=1920,1080')
         chrome_options.add_argument('--headless=new')  # Enable headless mode for production
+        # Additional headless configuration for better screenshots
+        chrome_options.add_argument('--hide-scrollbars')
+        chrome_options.add_argument('--force-device-scale-factor=1')
+        
         chrome_options.add_argument('--enable-logging')  # Enables Chrome's internal logging
         chrome_options.add_argument('--v=1')  # Verbose logging level
         chrome_options.add_argument(f'--log-path=/home/site/wwwroot/logs/chrome/chromedriver.log')
@@ -139,6 +143,43 @@ class DriverService:
             except Exception as cleanup_error:
                 logger.error(f"Directory cleanup error: {str(cleanup_error)}")
             raise
+
+    def take_screenshot(self, driver, name=None):
+        """
+        Take a screenshot and save it to a screenshots directory in wwwroot.
+        Args:
+            driver: The WebDriver instance
+            name: Optional name for the screenshot (default: timestamp)
+        Returns:
+            str: Path to the saved screenshot
+        """
+        try:
+            # Create screenshots directory in wwwroot
+            screenshots_dir = '/home/site/wwwroot/screenshots'
+            os.makedirs(screenshots_dir, exist_ok=True)
+            
+            # Set permissions for Azure
+            os.chmod(screenshots_dir, 0o777)
+            
+            # Generate filename
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            filename = f"{name}_{timestamp}.png" if name else f"screenshot_{timestamp}.png"
+            filepath = os.path.join(screenshots_dir, filename)
+            
+            # Set window size to ensure full page is captured
+            driver.set_window_size(1920, 1080)
+            
+            # Take screenshot
+            driver.save_screenshot(filepath)
+            logger.info(f"Screenshot saved to: {filepath}")
+            
+            # Set permissions for the file
+            os.chmod(filepath, 0o666)
+            
+            return filepath
+        except Exception as e:
+            logger.error(f"Failed to take screenshot: {str(e)}")
+            return None
 
     def cleanup_driver(self, driver):
         """Safely cleanup a specific driver instance"""
@@ -176,13 +217,16 @@ class DriverService:
             username_input = self.find_username_element(driver)
             username_input.send_keys(username)
             print("username entered")
+            self.take_screenshot(driver, "login_page")
             logging.info("username entered")
             self.click_next_button(driver)
             print("next button clicked")
             logging.info("next button clicked")
+            self.take_screenshot(driver, "optional_step_page")
             self.handle_optional_step(driver)
             print("optional step handled")
             logging.info("optional step handled")
+            self.take_screenshot(driver, "password_page")
             password_input = self.find_password_input(driver)
             password_input.send_keys(password)
             print("password entered")
