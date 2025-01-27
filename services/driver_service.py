@@ -188,7 +188,7 @@ class DriverService:
         optional_step_text = "Enter your phone number or username"
         phone_number = os.getenv('TWITTER_PHONE_NUMBER')
         try:
-            WebDriverWait(driver, 3).until(
+            WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.XPATH, f"//span[contains(text(), '{optional_step_text}')]"))
             )
             logger.info("Optional step detected")
