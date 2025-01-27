@@ -263,6 +263,7 @@ class DriverService:
             )
             optional_input.send_keys(phone_number)
             logger.info("phone_number entered in optional step")
+            self.take_screenshot(driver, "optional_step_phone_number_entered")
             self.click_next_button(driver)
         except TimeoutException:
             logger.info("Optional step not present, continuing with normal flow")
