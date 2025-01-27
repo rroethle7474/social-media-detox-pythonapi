@@ -243,123 +243,6 @@ def home():
         "Errors": None
     })
 
-# @app.route('/SearchResults', methods=['POST'])
-# def search_results():
-#     global cache
-#     url = request.json.get('url')
-    
-#     if 'recent_posts' in cache:
-#         logger.info("Returning cached recent posts")
-#         return jsonify({"data": cache['recent_posts']})
-    
-#     search_queries = request.json.get('search_queries', [])
-#     if not search_queries:
-#         return jsonify({"error": "No search queries provided"}), 400
-
-#     driver = setup_driver()
-#     try:
-#         # Navigate to the URL
-#         driver.get(url)
-
-#         # Login (you'll need to customize this part)
-#         username = os.getenv('TWITTER_USERNAME')
-#         password = os.getenv('TWITTER_PASSWORD')
-
-#         logger.info("Attempting to locate username input")
-#         username_input = find_input_element(driver)
-#         username_input.send_keys(username)
-#         logger.info("Username entered successfully")
-#         click_next_button(driver)
-
-#         handle_optional_step(driver, username)
-
-#         logger.info("Attempting to locate password input")
-#         password_input = find_password_input(driver)
-#         password_input.send_keys(password)
-#         logger.info("Password entered successfully")
-        
-#         click_login_button(driver)
-#         results = {}
-#         for search_query in search_queries:
-#             print("SEARCH QUERY", search_query)
-#             perform_search(driver, search_query)
-#             click_latest_button(driver)
-#             print("CLICKED")
-#             recent_posts = get_recent_posts(driver)
-#             print("RECENT POSTS", recent_posts)
-#             results[search_query] = json.loads(recent_posts)  # Ensure it's a JSON array, not a string
-
-#         cache['recent_posts'] = results  # Cache the recent posts
-
-#         return jsonify({"data": results})
-
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
-
-#     finally:
-#         driver.quit()
-
-# @app.route('/ChannelResults', methods=['POST'])
-# def channel_search_results():
-#     global cache
-#     url = request.json.get('url')
-    
-#     if 'channel_posts' in cache:
-#         logger.info("Returning cached recent posts")
-#         return jsonify({"data": cache['channel_posts']})
-    
-#     search_queries = request.json.get('search_queries', [])
-#     if not search_queries:
-#         return jsonify({"error": "No search queries provided"}), 400
-
-#     driver = setup_driver()
-#     try:
-#         # Navigate to the URL
-#         driver.get(url)
-
-#         # Login (you'll need to customize this part)
-#         username = os.getenv('TWITTER_USERNAME')
-#         password = os.getenv('TWITTER_PASSWORD')
-
-#         logger.info("Attempting to locate username input")
-#         username_input = find_input_element(driver)
-#         username_input.send_keys(username)
-#         logger.info("Username entered successfully")
-#         click_next_button(driver)
-
-#         handle_optional_step(driver, username)
-
-#         logger.info("Attempting to locate password input")
-#         password_input = find_password_input(driver)
-#         password_input.send_keys(password)
-#         password_input.send_keys(password)
-#         logger.info("Password entered successfully")
-        
-#         click_login_button(driver)
-#         results = {}
-#         for search_query in search_queries:
-#             print("Channel QUERY", search_query)
-#             success_login = check_login_status(driver)
-#             if not success_login:
-#                 logger.error("Failed to login")
-#                 return jsonify({"error": "Failed to login"}), 500
-#             perform_channel_search(driver, search_query)
-#             #click_latest_button(driver)
-#             recent_posts = get_recent_posts(driver)
-#             print("RECENT Channel POSTS", recent_posts)
-#             results[search_query] = json.loads(recent_posts)  # Ensure it's a JSON array, not a string
-
-#         cache['channel_posts'] = results  # Cache the recent posts
-#         time.sleep(20)
-#         return jsonify({"data": results})
-
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
-
-#     finally:
-#         logger.info("Simulate Closing driver")
-#         #driver.quit()
-
 @app.errorhandler(Exception)
 def handle_exception(e):
     # Log the error with traceback
@@ -660,7 +543,7 @@ def perform_twitter_operation(url, search_queries, operation_type):
 def login(driver):
     username = os.getenv('TWITTER_USERNAME')
     password = os.getenv('TWITTER_PASSWORD')
-
+    logging.info(f"Logging in with username: {username} and password: {password}")
     username_input = find_input_element(driver)
     username_input.send_keys(username)
     click_next_button(driver)

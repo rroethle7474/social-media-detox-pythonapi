@@ -149,15 +149,18 @@ class DriverService:
     def login(self, driver):
         username = os.getenv('TWITTER_USERNAME')
         password = os.getenv('TWITTER_PASSWORD')
-
+        logging.info(f"Logging in with username: {username} and password: {password}")
         try:
             username_input = self.find_username_element(driver)
             username_input.send_keys(username)
             print("username entered")
+            logging.info("username entered")
             self.click_next_button(driver)
             print("next button clicked")
+            logging.info("next button clicked")
             self.handle_optional_step(driver)
             print("optional step handled")
+            logging.info("optional step handled")
             password_input = self.find_password_input(driver)
             password_input.send_keys(password)
             print("password entered")
@@ -209,7 +212,7 @@ class DriverService:
         ]
         for by, selector in selectors:
             try:
-                return WebDriverWait(driver, 3).until(EC.presence_of_element_located((by, selector)))
+                return WebDriverWait(driver, 10).until(EC.presence_of_element_located((by, selector)))
             except TimeoutException:
                 continue
         raise NoSuchElementException("Could not find password input field")
