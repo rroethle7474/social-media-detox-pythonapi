@@ -27,6 +27,20 @@ from services.twitter_service import TwitterService
 # Set up logging
 log_handlers = [logging.StreamHandler()]
 
+# For Azure Linux environment
+if os.getenv('WEBSITE_HOSTNAME'):  # Running in Azure
+    os.makedirs('/home/LogFiles', exist_ok=True)
+    file_handler = logging.FileHandler('/home/LogFiles/application.log')
+    file_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    log_handlers.append(file_handler)
+
+logging.basicConfig(
+    level=logging.INFO,  # Set to INFO level
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=log_handlers
+)
 # Determine log file path based on environment
 # if os.getenv('WEBSITE_HOSTNAME'):  # Running in Azure
 #     log_path = '/home/LogFiles/app.log'
