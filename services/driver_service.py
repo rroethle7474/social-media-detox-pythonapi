@@ -204,18 +204,45 @@ class DriverService:
     
             
     def find_password_input(self,driver):
-        print("Finding password input")
+        logger.info("Finding password input field...")
+        # First wait for password form/container to be present
+        try:
+            WebDriverWait(driver, 20).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "form[data-testid='LoginForm']"))
+            )
+            logger.info("Login form found, searching for password input...")
+        except TimeoutException:
+            logger.warning("Login form not found, attempting to find password input directly...")
+
         selectors = [
             (By.CSS_SELECTOR, "input[name='password'][type='password']"),
             (By.CSS_SELECTOR, "input[autocomplete='current-password']"),
             (By.XPATH, "//input[@type='password' and contains(@class, 'r-30o5oe')]"),
+            (By.CSS_SELECTOR, "input[type='password']"),
+            (By.CSS_SELECTOR, "[data-testid='password-field']"),
+            (By.XPATH, "//input[contains(@class, 'password-field')]"),
+            (By.XPATH, "//div[contains(@class, 'LoginForm')]//input[@type='password']")
         ]
+        
         for by, selector in selectors:
             try:
-                return WebDriverWait(driver, 10).until(EC.presence_of_element_located((by, selector)))
+                logger.info(f"Trying selector: {selector}")
+                element = WebDriverWait(driver, 20).until(
+                    EC.presence_of_element_located((by, selector))
+                )
+                # Additional check to ensure element is interactable
+                WebDriverWait(driver, 5).until(
+                    EC.element_to_be_clickable((by, selector))
+                )
+                logger.info("Password input field found successfully")
+                return element
             except TimeoutException:
+                logger.debug(f"Selector {selector} not found, trying next...")
                 continue
-        raise NoSuchElementException("Could not find password input field")
+            
+        error_msg = "Could not find password input field after trying all selectors"
+        logger.error(error_msg)
+        raise NoSuchElementException(error_msg)
 
 
     def click_latest_button(self, driver):
