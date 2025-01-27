@@ -66,8 +66,20 @@ log_message "Chrome version: $chrome_version"
 
 # Create and set permissions for Chrome data directory
 log_message "Setting up Chrome data directory..."
-mkdir -p /home/site/wwwroot/chrome-data
-chmod 777 /home/site/wwwroot/chrome-data 
+CHROME_DATA_DIR="/home/site/wwwroot/chrome-data"
+mkdir -p $CHROME_DATA_DIR
+chmod 777 $CHROME_DATA_DIR
+
+# Clean up any existing Chrome processes and port files
+log_message "Cleaning up Chrome processes and files..."
+pkill -f "chrome" || true
+rm -f $CHROME_DATA_DIR/.com.google.Chrome.* || true
+rm -f $CHROME_DATA_DIR/SingletonLock || true
+rm -f $CHROME_DATA_DIR/DevToolsActivePort || true
+
+# Set Chrome data directory environment variable
+export CHROME_USER_DATA_DIR=$CHROME_DATA_DIR
+log_message "Chrome user data directory set to: $CHROME_USER_DATA_DIR"
 
 log_message "Installing Python dependencies..."
 $python_cmd -m pip install --upgrade pip

@@ -224,7 +224,25 @@ def health_check():
             "Errors": [str(e)]
         }), 500
         
-        
+@app.route('/robots933456.txt')
+def robots():
+    """
+    Azure's health check endpoint
+    """
+    return '', 200
+
+@app.route('/')
+def home():
+    """
+    Root endpoint
+    """
+    return jsonify({
+        "Success": True,
+        "Message": "API is running",
+        "Data": None,
+        "Errors": None
+    })
+
 # @app.route('/SearchResults', methods=['POST'])
 # def search_results():
 #     global cache
