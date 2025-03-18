@@ -143,10 +143,10 @@ class DriverService:
             except Exception as cleanup_error:
                 logger.error(f"Directory cleanup error: {str(cleanup_error)}")
             raise
-
+    # used for debugging
     def take_screenshot(self, driver, name=None):
         """
-        Take a screenshot and save it to a screenshots directory in wwwroot.
+        Take a screenshot and save it to a screenshots directory.
         Args:
             driver: The WebDriver instance
             name: Optional name for the screenshot (default: timestamp)
@@ -154,8 +154,8 @@ class DriverService:
             str: Path to the saved screenshot
         """
         try:
-            # Create screenshots directory in wwwroot
-            screenshots_dir = '/home/site/wwwroot/screenshots'
+            # Create screenshots directory if it doesn't exist
+            screenshots_dir = os.path.join(os.getcwd(), 'screenshots')
             os.makedirs(screenshots_dir, exist_ok=True)
             
             # Set permissions for Azure
@@ -217,16 +217,13 @@ class DriverService:
             username_input = self.find_username_element(driver)
             username_input.send_keys(username)
             print("username entered")
-            self.take_screenshot(driver, "login_page")
             logging.info("username entered")
             self.click_next_button(driver)
             print("next button clicked")
             logging.info("next button clicked")
-            self.take_screenshot(driver, "optional_step_page")
             self.handle_optional_step(driver)
             print("optional step handled")
             logging.info("optional step handled")
-            self.take_screenshot(driver, "password_page")
             password_input = self.find_password_input(driver)
             password_input.send_keys(password)
             print("password entered")
@@ -263,7 +260,6 @@ class DriverService:
             )
             optional_input.send_keys(phone_number)
             logger.info("phone_number entered in optional step")
-            self.take_screenshot(driver, "optional_step_phone_number_entered")
             self.click_next_button(driver)
         except TimeoutException:
             logger.info("Optional step not present, continuing with normal flow")
