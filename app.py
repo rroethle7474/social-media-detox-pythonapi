@@ -421,7 +421,7 @@ def find_password_input(driver):
     ]
     for by, selector in selectors:
         try:
-            return WebDriverWait(driver, 10).until(EC.presence_of_element_located((by, selector)))
+            return WebDriverWait(driver, 5).until(EC.presence_of_element_located((by, selector)))
         except TimeoutException:
             continue
     raise NoSuchElementException("Could not find password input field")
