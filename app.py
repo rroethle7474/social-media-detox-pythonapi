@@ -113,7 +113,6 @@ atexit.register(driver_service.cleanup_all_drivers)
 @app.route('/ChannelResults', methods=['POST'])
 def channel_search_results():
     try:
-        print("Retrieving channel search results")
         url = request.json.get('url')
         isDefault = request.json.get('isDefault', False)
         search_queries = request.json.get('search_queries', [])

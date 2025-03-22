@@ -44,12 +44,22 @@ class TwitterService:
             for search_query in search_queries:
                 try:
                     if operation_type == 'channel':
-                        print(f"Performing channel search for {search_query}")
+                        logger.info(f"Performing channel search for {search_query}")
                         self.perform_channel_search(driver, search_query)
                     else:
+                        logger.info(f"Performing search for {search_query}")
                         self.perform_search(driver, search_query)
-                        self.driver_service.click_latest_button(driver)
+                        
+                        # Click the "Latest" button to get the most recent tweets
+                        latest_clicked = self.driver_service.click_latest_button(driver)
+                        if latest_clicked:
+                            logger.info("Latest button clicked successfully, waiting for results to load...")
+                            # Wait for the page to update after clicking Latest (reduced from 5 to 2.5 seconds)
+                            time.sleep(2.5)
+                        else:
+                            logger.warning("Could not click Latest button, using default results")
                     
+                    # Get the recent posts
                     recent_posts = self.get_recent_posts(driver)
                     results[search_query] = json.loads(recent_posts)
                 except Exception as e:
@@ -68,7 +78,10 @@ class TwitterService:
             return None, errors
         finally:
             if driver:
-                self.driver_service.cleanup_driver(driver)
+                try:
+                    self.driver_service.close_driver(driver)
+                except Exception as e:
+                    logger.error(f"Error closing driver: {str(e)}")
 
     def perform_channel_search(self, driver, search_query):
         url = f"{self.base_url}/{search_query}"
@@ -167,66 +180,93 @@ class TwitterService:
             logger.error(f"Error during search for {search_query}: {str(e)}")
             raise;
         
-    def get_recent_posts(self, driver, num_posts=5):
+    def get_recent_posts(self, driver, num_posts=10):
         try:
-            # Wait for tweets to load
-                WebDriverWait(driver, 5).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "article[data-testid='tweet']"))
-                )
+            # Wait for tweets to load with a shorter timeout (10 seconds instead of 15)
+            logger.info("Waiting for tweets to load...")
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "article[data-testid='tweet']"))
+            )
+            
+            # Add a shorter wait to ensure all tweets are fully loaded (reduced from 3 to 1 second)
+            time.sleep(1)
+            
+            # Scroll down to load more tweets if we need more than what's initially visible
+            if num_posts > 5:
+                logger.info(f"Scrolling to load more tweets (target: {num_posts})")
+                tweets_found = len(driver.find_elements(By.CSS_SELECTOR, "article[data-testid='tweet']"))
+                scroll_attempts = 0
+                max_scroll_attempts = 5
                 
-                # Get the page source and parse it with BeautifulSoup
-                page_source = driver.page_source
-                soup = BeautifulSoup(page_source, 'html.parser')
-                # print(soup.prettify())
-                # time.sleep(10)
-                # Find all tweet articles
-                tweets = soup.find_all('article', attrs={'data-testid': 'tweet'})
-                # print("TWEETS", tweets)
-                # time.sleep(10)
-                recent_posts = []
-                print(f"Number of tweets: {len(tweets)}")
-                # pause any execution here so I can examine what the automated browser is seeing
-                for tweet in tweets[:num_posts]:
-                    try:
-                        embed_url = self.__extract_tweet_url(tweet)
-                        if self.is_invalid_embed_url(embed_url):
-                            print(f"Invalid embed URL: {embed_url}")
-                            continue;
-                        
-                        full_name = tweet.find('div', attrs={'data-testid': 'User-Name'}).text
-                        channel, username = full_name.split('@', 1)
-                        username = '@' + username  # Add @ back to the username
-                        # Extract tweet text
-                        tweet_text = tweet.find('div', attrs={'data-testid': 'tweetText'}).text if tweet.find('div', attrs={'data-testid': 'tweetText'}) else ''
-                        # Extract timestamp
-                        
-                        timestamp_element = tweet.find('time')
-                        timestamp = timestamp_element['datetime'] if timestamp_element else datetime.now(UTC).isoformat()
+                while tweets_found < num_posts and scroll_attempts < max_scroll_attempts:
+                    # Scroll down
+                    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                    scroll_attempts += 1
+                    
+                    # Wait for new tweets to load (reduced from 2 to 1 second)
+                    time.sleep(1)
+                    
+                    # Count tweets again
+                    new_count = len(driver.find_elements(By.CSS_SELECTOR, "article[data-testid='tweet']"))
+                    
+                    # If no new tweets were loaded, break the loop
+                    if new_count == tweets_found:
+                        logger.info(f"No new tweets loaded after scrolling, stopping at {tweets_found} tweets")
+                        break
+                    
+                    tweets_found = new_count
+                    logger.info(f"Found {tweets_found} tweets after scrolling {scroll_attempts} times")
+            
+            # Get the page source and parse it with BeautifulSoup
+            page_source = driver.page_source
+            soup = BeautifulSoup(page_source, 'html.parser')
+            
+            # Find all tweet articles
+            tweets = soup.find_all('article', attrs={'data-testid': 'tweet'})
+            
+            recent_posts = []
+            logger.info(f"Number of tweets found: {len(tweets)}")
+            
+            # Process each tweet
+            for tweet in tweets[:num_posts]:
+                try:
+                    embed_url = self.__extract_tweet_url(tweet)
+                    if self.is_invalid_embed_url(embed_url):
+                        logger.info(f"Invalid embed URL: {embed_url}")
+                        continue
+                    
+                    full_name = tweet.find('div', attrs={'data-testid': 'User-Name'}).text
+                    channel, username = full_name.split('@', 1)
+                    username = '@' + username  # Add @ back to the username
+                    
+                    # Extract tweet text
+                    tweet_text = tweet.find('div', attrs={'data-testid': 'tweetText'}).text if tweet.find('div', attrs={'data-testid': 'tweetText'}) else ''
+                    
+                    # Extract timestamp
+                    timestamp_element = tweet.find('time')
+                    timestamp = timestamp_element['datetime'] if timestamp_element else datetime.now(UTC).isoformat()
+                    
+                    tweet_obj = TwitterResult(  
+                        channel=channel,
+                        username=username,
+                        description=tweet_text,
+                        published_date=timestamp,
+                        embed_url=embed_url
+                    )
+                    recent_posts.append(tweet_obj)
+                except Exception as e:
+                    logger.error(f"Error during tweet processing: {str(e)}")
+                    continue
+              
+            logger.info(f"Retrieved {len(recent_posts)} recent posts")
+            tweet_dicts = [tweet.__dict__ for tweet in recent_posts]
 
-                        
-                        tweet = TwitterResult(  
-                            channel=channel,
-                            username=username,
-                            description=tweet_text,
-                            published_date=timestamp,
-                            embed_url=embed_url
-                        )
-                        recent_posts.append(tweet)
-                    except Exception as e:
-                        logger.error(f"Error during tweet processing: {str(e)}")
-                        continue;
-                  
-                logger.info(f"Retrieved {len(recent_posts)} recent posts")
-                #input("Press Enter to continue...")
-                tweet_dicts = [tweet.__dict__ for tweet in recent_posts]
-
-                # Convert the list of dictionaries to JSON
-                json_data = json.dumps(tweet_dicts, default=self.__datetime_to_iso)
-                return json_data
+            # Convert the list of dictionaries to JSON
+            json_data = json.dumps(tweet_dicts, default=self.__datetime_to_iso)
+            return json_data
         except Exception as e:
             logger.error(f"Error retrieving recent posts: {str(e)}")
-            raise;
-    
+            raise
     
     # private method region
     def __extract_tweet_url(self, tweet_div):
