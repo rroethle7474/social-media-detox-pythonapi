@@ -98,6 +98,34 @@ For production:
 gunicorn --bind="0.0.0.0:8000" --timeout 120 --workers 2 --threads 4 --worker-class sync --log-level info app:app
 ```
 
+### Running on Windows
+
+Gunicorn is not compatible with Windows as it depends on Unix-specific modules. For Windows development, use Flask's built-in development server instead:
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the Flask development server
+flask run --host=127.0.0.1 --port=5000
+```
+
+Or directly with Python:
+
+```bash
+python -m flask run --host=127.0.0.1 --port=5000
+```
+
+For production on Windows, consider using a WSGI server that's compatible with Windows, such as Waitress:
+
+```bash
+# Install Waitress
+pip install waitress
+
+# Run with Waitress
+waitress-serve --host=127.0.0.1 --port=5000 app:app
+```
+
 ### Chrome Requirements
 
 The application requires Google Chrome to be installed. For local development:
